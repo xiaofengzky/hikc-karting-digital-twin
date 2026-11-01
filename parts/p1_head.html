@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>HIKC 湖北国际卡丁车赛车场 · 数字孪生</title>
+<style>
+:root{
+  --bg:#0a0b0d; --panel:rgba(16,18,22,.82); --panel-b:rgba(255,255,255,.09);
+  --txt:#e8eaee; --txt2:#9aa3b0; --acc:#ff3b1f; --acc2:#ffb300; --ok:#3ddc84;
+  --fs:13px;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;height:100%;overflow:hidden;background:var(--bg);
+  font-family:"PingFang SC","Microsoft YaHei",system-ui,-apple-system,sans-serif;
+  color:var(--txt);font-size:var(--fs);letter-spacing:.2px}
+canvas{display:block}
+#app{position:fixed;inset:0}
+.hide{opacity:0!important;pointer-events:none!important}
+
+/* ---------- 加载 ---------- */
+#loader{position:fixed;inset:0;z-index:100;background:#08090b;display:flex;
+  align-items:center;justify-content:center;flex-direction:column;gap:22px;
+  transition:opacity .8s ease}
+#loader .mark{font-size:26px;font-weight:800;letter-spacing:6px;
+  background:linear-gradient(100deg,#fff,#ffb300 55%,#ff3b1f);
+  -webkit-background-clip:text;background-clip:text;color:transparent}
+#loader .sub{font-size:11px;color:#5d6570;letter-spacing:3px}
+#bar{width:230px;height:2px;background:#1b1e23;overflow:hidden;border-radius:2px}
+#bar i{display:block;height:100%;width:0%;background:linear-gradient(90deg,#ff3b1f,#ffb300);
+  transition:width .35s ease}
+#ltxt{font-size:11px;color:#6d7683;letter-spacing:1px;height:14px}
+
+/* ---------- 顶栏 ---------- */
+#top{position:fixed;top:0;left:0;right:0;z-index:20;padding:16px 18px;
+  display:flex;align-items:flex-start;justify-content:space-between;
+  background:linear-gradient(180deg,rgba(0,0,0,.62),transparent);pointer-events:none}
+#top>*{pointer-events:auto}
+.brand{display:flex;align-items:center;gap:11px}
+.brand .logo{width:38px;height:38px;border-radius:9px;flex:none;
+  background:linear-gradient(145deg,#ff3b1f,#c11a06);display:grid;place-items:center;
+  font-weight:900;font-size:12px;letter-spacing:-.5px;color:#fff;
+  box-shadow:0 6px 18px rgba(255,59,31,.32)}
+.brand h1{margin:0;font-size:15px;font-weight:700;letter-spacing:.8px}
+.brand p{margin:3px 0 0;font-size:10.5px;color:var(--txt2);letter-spacing:1.4px}
+.brand p b{color:var(--acc2);font-weight:600}
+
+#hint{position:fixed;top:74px;left:50%;transform:translateX(-50%);z-index:19;
+  padding:7px 15px;border-radius:20px;background:rgba(10,11,13,.72);
+  border:1px solid var(--panel-b);font-size:11.5px;color:#b9c1cc;
+  backdrop-filter:blur(10px);white-space:nowrap;transition:opacity .6s}
+
+/* ---------- 右侧控制台 ---------- */
+#panel{position:fixed;top:78px;right:16px;width:268px;z-index:22;
+  background:var(--panel);border:1px solid var(--panel-b);border-radius:16px;
+  backdrop-filter:blur(22px) saturate(1.3);box-shadow:0 18px 50px rgba(0,0,0,.55);
+  overflow:hidden;transition:transform .35s cubic-bezier(.4,0,.2,1),opacity .3s}
+#panel.collapsed{transform:translateX(calc(100% + 24px));opacity:0}
+.ph{display:flex;align-items:center;justify-content:space-between;padding:13px 15px 11px;
+  border-bottom:1px solid rgba(255,255,255,.07)}
+.ph span{font-size:11px;letter-spacing:2px;color:#8e97a3;font-weight:600}
+.ph button{background:none;border:none;color:#7d8592;cursor:pointer;font-size:16px;
+  line-height:1;padding:2px 4px;border-radius:5px}
+.ph button:hover{color:#fff;background:rgba(255,255,255,.07)}
+.pb{padding:14px 15px 16px;max-height:calc(100vh - 190px);overflow-y:auto}
+.pb::-webkit-scrollbar{width:5px}
+.pb::-webkit-scrollbar-thumb{background:#2a2f36;border-radius:3px}
+
+.grp{margin-bottom:15px}
+.grp:last-child{margin-bottom:2px}
+.gl{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:7px}
+.gl span{font-size:10.5px;letter-spacing:1.6px;color:#7f8895;text-transform:uppercase}
+.gl b{font-size:11.5px;color:var(--acc2);font-weight:600;font-variant-numeric:tabular-nums}
+
+/* 天气按钮 */
+.wx{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
+.wx button{background:rgba(255,255,255,.045);border:1px solid rgba(255,255,255,.07);
+  border-radius:9px;padding:8px 2px 6px;cursor:pointer;color:#a8b0bc;
+  display:flex;flex-direction:column;align-items:center;gap:3px;
+  transition:.18s;font-size:9px;letter-spacing:.2px}
+.wx button i{font-size:16px;font-style:normal;line-height:1;filter:grayscale(.4) brightness(1.15)}
+.wx button:hover{background:rgba(255,255,255,.09);color:#fff;transform:translateY(-1px)}
+.wx button.on{background:linear-gradient(160deg,rgba(255,59,31,.22),rgba(255,179,0,.12));
+  border-color:rgba(255,120,40,.55);color:#fff;box-shadow:0 0 0 1px rgba(255,120,40,.18) inset}
+.wx button.on i{filter:none}
+
+/* 滑块 */
+input[type=range]{-webkit-appearance:none;width:100%;height:22px;background:transparent;cursor:pointer}
+input[type=range]::-webkit-slider-runnable-track{height:3px;border-radius:2px;
+  background:linear-gradient(90deg,#2a2f36,#3a4048)}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:13px;height:13px;
+  border-radius:50%;background:#fff;margin-top:-5px;border:2.5px solid var(--acc);
+  box-shadow:0 2px 8px rgba(255,59,31,.55);transition:transform .15s}
+input[type=range]::-webkit-slider-thumb:hover{transform:scale(1.18)}
+
+.chips{display:flex;gap:5px}
+.chips button{flex:1;background:rgba(255,255,255,.045);border:1px solid rgba(255,255,255,.07);
+  color:#98a1ad;border-radius:7px;padding:6px 0;font-size:10.5px;cursor:pointer;
+  transition:.16s;font-family:inherit}
+.chips button:hover{background:rgba(255,255,255,.09);color:#fff}
+.chips button.on{background:rgba(255,59,31,.2);border-color:rgba(255,90,50,.5);color:#ffd9c9}
+
+/* 状态卡片 */
+.stat{background:rgba(255,255,255,.035);border:1px solid rgba(255,255,255,.06);
+  border-radius:11px;padding:10px 12px;margin-top:9px}
+.srow{display:flex;justify-content:space-between;align-items:center;
+  font-size:11px;padding:3.5px 0;color:#98a1ad}
+.srow b{color:#e8eaee;font-weight:600;font-variant-numeric:tabular-nums}
+.meter{height:4px;border-radius:2px;background:#21252b;overflow:hidden;margin-top:7px}
+.meter i{display:block;height:100%;width:0%;border-radius:2px;
+  transition:width .5s ease,background .5s ease}
+
+/* ---------- 左下 机位 ---------- */
+#views{position:fixed;left:16px;bottom:16px;z-index:22;display:flex;flex-direction:column;
+  gap:6px;transition:opacity .3s}
+#views .vt{font-size:9.5px;letter-spacing:2.2px;color:#6b7481;margin-bottom:2px;padding-left:3px}
+#views button{display:flex;align-items:center;gap:8px;background:rgba(14,16,20,.78);
+  border:1px solid rgba(255,255,255,.075);color:#b3bbc6;border-radius:9px;
+  padding:7px 12px 7px 9px;font-size:11px;cursor:pointer;backdrop-filter:blur(14px);
+  transition:.16s;font-family:inherit;text-align:left;min-width:104px}
+#views button em{font-style:normal;font-size:9px;color:#5f6873;margin-left:auto;
+  padding-left:8px;font-variant-numeric:tabular-nums}
+#views button:hover{background:rgba(30,34,40,.92);color:#fff;transform:translateX(2px)}
+#views button.on{background:rgba(255,59,31,.16);border-color:rgba(255,90,50,.45);color:#fff}
+
+/* ---------- 底部状态 ---------- */
+#bar2{position:fixed;left:50%;bottom:16px;transform:translateX(-50%);z-index:21;
+  display:flex;align-items:center;gap:0;background:rgba(12,14,18,.8);
+  border:1px solid rgba(255,255,255,.08);border-radius:12px;padding:8px 6px;
+  backdrop-filter:blur(18px);box-shadow:0 10px 32px rgba(0,0,0,.5);
+  font-variant-numeric:tabular-nums}
+#bar2 .it{padding:0 14px;display:flex;flex-direction:column;gap:2px;
+  border-right:1px solid rgba(255,255,255,.06)}
+#bar2 .it:last-child{border-right:none}
+#bar2 .k{font-size:8.5px;letter-spacing:1.4px;color:#5f6873}
+#bar2 .v{font-size:13px;color:#e8eaee;font-weight:600;letter-spacing:.3px}
+#bar2 .v small{font-size:9px;color:#7f8895;font-weight:400;margin-left:1px}
+#bar2 .v.warn{color:var(--acc2)}
+#bar2 .v.bad{color:#ff5b3d}
+
+/* ---------- 标签热区 ---------- */
+#tags{position:fixed;inset:0;pointer-events:none;z-index:15;overflow:hidden}
+.tag{position:absolute;transform:translate(-50%,-100%);pointer-events:auto;cursor:pointer;
+  background:rgba(10,12,15,.72);border:1px solid rgba(255,255,255,.14);border-radius:7px;
+  padding:5px 9px;font-size:10.5px;color:#d6dbe3;white-space:nowrap;
+  backdrop-filter:blur(8px);transition:.15s;display:flex;align-items:center;gap:5px}
+.tag:hover{background:rgba(255,59,31,.9);border-color:#ff7a5c;color:#fff;transform:translate(-50%,-100%) scale(1.05)}
+.tag:before{content:'';position:absolute;left:50%;bottom:-5px;width:1px;height:5px;
+  background:rgba(255,255,255,.3)}
+.tag i{font-style:normal;color:var(--acc2);font-size:9px}
+
+/* 信息浮窗 */
+#info{position:fixed;left:50%;top:64px;transform:translate(-50%,-8px);z-index:30;
+  width:330px;background:rgba(14,16,20,.94);border:1px solid rgba(255,255,255,.11);
+  border-radius:14px;padding:16px 17px;backdrop-filter:blur(26px);
+  box-shadow:0 22px 60px rgba(0,0,0,.65);opacity:0;pointer-events:none;
+  transition:.26s cubic-bezier(.4,0,.2,1)}
+#info.show{opacity:1;transform:translate(-50%,0);pointer-events:auto}
+#info h3{margin:0 0 3px;font-size:14px;letter-spacing:.5px}
+#info .en{font-size:9.5px;color:#6b7481;letter-spacing:1.6px;margin-bottom:10px}
+#info .rows{display:grid;grid-template-columns:auto 1fr;gap:5px 14px;font-size:11.5px;
+  color:#9aa3b0;margin-top:9px}
+#info .rows b{color:#e8eaee;text-align:right;font-weight:500}
+#info p{margin:9px 0 0;font-size:11.5px;line-height:1.65;color:#a8b0bc}
+#info .x{position:absolute;top:11px;right:12px;background:none;border:none;color:#6b7481;
+  cursor:pointer;font-size:17px;line-height:1}
+
+/* ---------- 罗盘 & 小地图 ---------- */
+#mapwrap{position:fixed;right:16px;bottom:16px;z-index:21;
+  background:rgba(12,14,18,.8);border:1px solid rgba(255,255,255,.08);
+  border-radius:13px;padding:9px;backdrop-filter:blur(16px);
+  box-shadow:0 10px 32px rgba(0,0,0,.5)}
+#minimap{display:block;border-radius:7px}
+#mapwrap .mt{display:flex;justify-content:space-between;margin-top:6px;
+  font-size:8.5px;color:#5f6873;letter-spacing:1.2px;padding:0 2px}
+
+/* 刷新按钮 */
+#toggle{position:fixed;top:78px;right:16px;z-index:23;width:38px;height:38px;
+  border-radius:11px;background:var(--panel);border:1px solid var(--panel-b);
+  color:#b3bbc6;cursor:pointer;backdrop-filter:blur(18px);
+  display:none;place-items:center;font-size:15px}
+#panel.collapsed~#toggle{display:grid}
+
+@media(max-width:820px){
+  #panel{width:calc(100% - 24px);right:12px;top:70px}
+  #views{bottom:auto;top:70px;left:12px;flex-direction:row;flex-wrap:wrap;max-width:180px}
+  #views .vt{display:none}
+  #views button{min-width:0;padding:6px 9px;font-size:10px}
+  #views button em{display:none}
+  #bar2{width:calc(100% - 24px);left:12px;transform:none;bottom:12px;
+    justify-content:space-between;padding:6px 2px;overflow-x:auto}
+  #bar2 .it{padding:0 9px}
+  #mapwrap{display:none}
+  #hint{display:none}
+}
+</style>
+</head>
+<body>
+<div id="app"></div>
+
+<div id="loader">
+  <div class="mark">HIKC</div>
+  <div class="sub">HUBEI INTERNATIONAL KARTING CIRCUIT</div>
+  <div id="bar"><i></i></div>
+  <div id="ltxt">初始化场景…</div>
+</div>
+
+<div id="top">
+  <div class="brand">
+    <div class="logo">HIKC</div>
+    <div>
+      <h1>湖北国际卡丁车赛车场</h1>
+      <p>孝感市孝南区 · 奥体公园 · <b>王母湖西岸</b> · FIA 1 级标准</p>
+    </div>
+  </div>
+</div>
+
+<div id="hint">拖拽旋转 · 滚轮缩放 · <b>WASD</b> 漫游 · <b>Shift</b> 加速 · 点击标签查看详情</div>
+
+<div id="panel">
+  <div class="ph"><span>环境模拟</span><button id="collapse">›</button></div>
+  <div class="pb">
+
+    <div class="grp">
+      <div class="gl"><span>天气</span><b id="wxName">晴</b></div>
+      <div class="wx" id="wxBtns">
+        <button data-w="clear" class="on"><i>☀</i>晴</button>
+        <button data-w="partly"><i>⛅</i>多云</button>
+        <button data-w="overcast"><i>☁</i>阴</button>
+        <button data-w="lightRain"><i>🌦</i>小雨</button>
+        <button data-w="heavyRain"><i>🌧</i>大雨</button>
+        <button data-w="storm"><i>⛈</i>雷雨</button>
+        <button data-w="fog"><i>🌫</i>雾</button>
+        <button data-w="snow"><i>❄</i>雪</button>
+      </div>
+    </div>
+
+    <div class="grp">
+      <div class="gl"><span>时刻</span><b id="tLabel">14:00</b></div>
+      <input type="range" id="timeRange" min="0" max="24" step="0.05" value="14">
+      <div class="chips" style="margin-top:6px">
+        <button data-t="7.2">清晨</button>
+        <button data-t="12">正午</button>
+        <button data-t="17.6">黄昏</button>
+        <button data-t="21.5">夜晚</button>
+      </div>
+    </div>
+
+    <div class="grp">
+      <div class="gl"><span>时节</span><b id="seasonName">秋季</b></div>
+      <div class="chips" id="seasonBtns">
+        <button data-s="0.12">春</button>
+        <button data-s="0.48" class="on">秋</button>
+        <button data-s="0.25">夏</button>
+        <button data-s="0.88">冬</button>
+      </div>
+    </div>
+
+    <div class="grp">
+      <div class="gl"><span>时间流速</span><b id="spdLabel">实时</b></div>
+      <div class="chips" id="spdBtns">
+        <button data-v="1" class="on">1×</button>
+        <button data-v="8">8×</button>
+        <button data-v="40">40×</button>
+        <button data-v="0">暂停</button>
+      </div>
+    </div>
+
+    <div class="grp">
+      <div class="stat">
+        <div class="srow"><span>路面</span><b id="surfTxt">干燥</b></div>
+        <div class="meter"><i id="wetBar" style="background:linear-gradient(90deg,#3ddc84,#ffb300,#ff3b1f)"></i></div>
+        <div class="srow" style="margin-top:9px"><span>抓地力</span><b id="gripTxt">100%</b></div>
+        <div class="meter"><i id="gripBar" style="background:linear-gradient(90deg,#ff3b1f,#ffb300,#3ddc84)"></i></div>
+        <div class="srow" style="margin-top:9px"><span>路面温度</span><b id="rtempTxt">32°C</b></div>
+        <div class="srow"><span>积水深度</span><b id="depthTxt">0.0 mm</b></div>
+      </div>
+    </div>
+
+  </div>
+</div>
+<button id="toggle">‹</button>
+
+<div id="views">
+  <div class="vt">视角</div>
+  <button data-v="orbit" class="on">全景环绕<em>1</em></button>
+  <button data-v="fly">自由漫游<em>2</em></button>
+  <button data-v="grand">主看台<em>4</em></button>
+  <button data-v="pit">维修区<em>5</em></button>
+  <button data-v="lap">单圈巡游<em>6</em></button>
+  <button data-v="fpv">跟车穿越<em>F</em></button>
+  <button data-v="lake">湖岸远眺<em>7</em></button>
+</div>
+
+<div id="bar2">
+  <div class="it"><div class="k">当地时间</div><div class="v" id="bClock">14:00</div></div>
+  <div class="it"><div class="k">气温</div><div class="v" id="bTemp">24<small>°C</small></div></div>
+  <div class="it"><div class="k">湿度</div><div class="v" id="bHum">52<small>%</small></div></div>
+  <div class="it"><div class="k">风速</div><div class="v" id="bWind">3.2<small>m/s</small></div></div>
+  <div class="it"><div class="k">能见度</div><div class="v" id="bVis">20<small>km</small></div></div>
+  <div class="it"><div class="k">太阳高度</div><div class="v" id="bSun">58<small>°</small></div></div>
+</div>
+
+<div id="mapwrap">
+  <canvas id="minimap" width="196" height="128"></canvas>
+  <div class="mt"><span>赛道 1240m · 17 弯</span><span id="mmS">0 m</span></div>
+</div>
+
+<div id="tags"></div>
+
+<div id="info">
+  <button class="x" id="infoX">×</button>
+  <h3 id="iTitle">标题</h3>
+  <div class="en" id="iEn">SUBTITLE</div>
+  <p id="iDesc"></p>
+  <div class="rows" id="iRows"></div>
+</div>
+
+<script>/* THREE_JS_INLINE */</script>
+<script>
