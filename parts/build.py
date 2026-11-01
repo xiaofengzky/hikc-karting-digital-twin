@@ -42,3 +42,9 @@ target = os.path.normpath(os.path.join(base, '..', 'HIKC_孝感卡丁车赛车�
 with io.open(target, 'w', encoding='utf-8') as fh:
     fh.write(html)
 print('written', target, len(html), 'chars', round(os.path.getsize(target) / 1024, 1), 'KB')
+
+# GitHub Pages 入口（保持链接干净：/repo/ 直接打开）
+idx = os.path.normpath(os.path.join(base, '..', 'index.html'))
+with io.open(idx, 'w', encoding='utf-8') as fh:
+    fh.write(html)
+print('entry  ', idx, '(GitHub Pages 入口)')
